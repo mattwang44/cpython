@@ -17,13 +17,20 @@ __all__ = ['URLError', 'HTTPError', 'ContentTooShortError']
 
 
 class URLError(OSError):
-    # URLError is a sub-type of OSError, but it doesn't share any of
-    # the implementation. It overrides __init__ and __str__.
-    # It sets self.args for compatibility with other OSError
-    # subclasses, but args doesn't have the typical format with errno in
-    # slot 0 and strerror in slot 1.  This may be better than nothing.
+    # URLError is a sub-type of OSError. When the underlying reason is
+    # itself an OSError (e.g. a wrapped socket failure), propagate its
+    # ``errno`` and ``strerror`` to the URLError so callers performing
+    # introspection on the exception see the same attributes they would
+    # see on the original error.
+    #
+    # ``args`` retains the historical ``(reason,)`` shape rather than the
+    # standard OSError ``(errno, strerror, ...)`` for backwards compatibility.
     def __init__(self, reason, filename=None):
-        self.args = reason,
+        if isinstance(reason, OSError):
+            super().__init__(reason.errno, reason.strerror)
+        else:
+            super().__init__()
+        self.args = (reason,)
         self.reason = reason
         if filename is not None:
             self.filename = filename

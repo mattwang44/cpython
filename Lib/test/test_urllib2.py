@@ -83,6 +83,21 @@ class TrivialTests(unittest.TestCase):
         err = urllib.error.URLError('reason')
         self.assertIn(err.reason, str(err))
 
+    def test_URLError_propagates_errno_from_oserror(self):
+        inner = ConnectionRefusedError(111, 'Connection refused')
+        err = urllib.error.URLError(inner)
+        self.assertEqual(err.errno, 111)
+        self.assertEqual(err.strerror, 'Connection refused')
+        self.assertIs(err.reason, inner)
+        self.assertEqual(err.args, (inner,))
+
+    def test_URLError_string_reason_leaves_errno_unset(self):
+        err = urllib.error.URLError('plain string reason')
+        self.assertIsNone(err.errno)
+        self.assertIsNone(err.strerror)
+        self.assertEqual(err.reason, 'plain string reason')
+        self.assertEqual(err.args, ('plain string reason',))
+
 
 class RequestHdrsTests(unittest.TestCase):
 

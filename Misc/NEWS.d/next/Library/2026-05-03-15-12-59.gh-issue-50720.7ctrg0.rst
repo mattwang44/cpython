@@ -1,0 +1,3 @@
+:exc:`urllib.error.URLError` now propagates the :attr:`~OSError.errno`
+and :attr:`~OSError.strerror` attributes from a wrapped :exc:`OSError`
+to the :class:`URLError` instance.
