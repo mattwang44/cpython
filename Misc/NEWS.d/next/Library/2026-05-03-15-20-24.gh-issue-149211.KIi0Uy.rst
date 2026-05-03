@@ -1,0 +1,6 @@
+The C ``_warnings`` module now caches the Python-level
+``_showwarnmsg`` callable and ``WarningMessage`` class so that warnings
+emitted after the ``warnings`` module has begun being torn down (for
+example, from a ``__del__`` during interpreter shutdown) can still
+dispatch through a user-installed :func:`warnings.showwarning` hook,
+provided at least one prior warning emission has primed the cache.

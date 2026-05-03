@@ -70,6 +70,8 @@ warnings_clear_state(WarningsState *st)
     Py_CLEAR(st->once_registry);
     Py_CLEAR(st->default_action);
     Py_CLEAR(st->context);
+    Py_CLEAR(st->cached_showwarnmsg);
+    Py_CLEAR(st->cached_warning_message_cls);
 }
 
 #ifndef Py_DEBUG
@@ -720,6 +722,7 @@ call_show_warning(PyThreadState *tstate, PyObject *category,
 {
     PyObject *show_fn, *msg, *res, *warnmsg_cls = NULL;
     PyInterpreterState *interp = tstate->interp;
+    WarningsState *st = warnings_get_state(interp);
 
     /* The Python implementation is able to log the traceback where the source
        was allocated, whereas the C implementation doesn't. */
@@ -727,8 +730,19 @@ call_show_warning(PyThreadState *tstate, PyObject *category,
     if (show_fn == NULL) {
         if (PyErr_Occurred())
             return -1;
-        show_warning(tstate, filename, lineno, text, category, sourceline);
-        return 0;
+        /* Module attribute lookup failed (typically because the warnings
+           module is being torn down during interpreter shutdown). Fall back
+           to a cached reference captured during a prior successful call. */
+        if (st != NULL && st->cached_showwarnmsg != NULL) {
+            show_fn = Py_NewRef(st->cached_showwarnmsg);
+        }
+        else {
+            show_warning(tstate, filename, lineno, text, category, sourceline);
+            return 0;
+        }
+    }
+    else if (st != NULL) {
+        Py_XSETREF(st->cached_showwarnmsg, Py_NewRef(show_fn));
     }
 
     if (!PyCallable_Check(show_fn)) {
@@ -739,11 +753,20 @@ call_show_warning(PyThreadState *tstate, PyObject *category,
 
     warnmsg_cls = GET_WARNINGS_ATTR(interp, WarningMessage, 0);
     if (warnmsg_cls == NULL) {
-        if (!PyErr_Occurred()) {
+        if (PyErr_Occurred()) {
+            goto error;
+        }
+        if (st != NULL && st->cached_warning_message_cls != NULL) {
+            warnmsg_cls = Py_NewRef(st->cached_warning_message_cls);
+        }
+        else {
             PyErr_SetString(PyExc_RuntimeError,
                     "unable to get warnings.WarningMessage");
+            goto error;
         }
-        goto error;
+    }
+    else if (st != NULL) {
+        Py_XSETREF(st->cached_warning_message_cls, Py_NewRef(warnmsg_cls));
     }
 
     msg = PyObject_CallFunctionObjArgs(warnmsg_cls, message, category,

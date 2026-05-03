@@ -893,6 +893,34 @@ class PyWarnTests(WarnTests, unittest.TestCase):
         self.assertHasAttr(self.module.warn, '__code__')
 
 
+class ShowWarningCacheTests(unittest.TestCase):
+    # Verify that the C _warnings module caches the Python-level
+    # _showwarnmsg callable so that warnings emitted after the warnings
+    # module has begun being torn down (for example, from a __del__ during
+    # interpreter shutdown) still dispatch to a user-installed
+    # warnings.showwarning hook rather than silently falling back to the
+    # built-in C default.
+
+    def test_cached_showwarnmsg_survives_attr_removal(self):
+        import warnings as wmod
+        hits = []
+
+        def custom(message, *args, **kwargs):
+            hits.append(str(message))
+
+        with wmod.catch_warnings():
+            wmod.simplefilter("always")
+            saved_showwarnmsg = wmod._showwarnmsg
+            try:
+                wmod.showwarning = custom
+                wmod.warn("first")
+                del wmod._showwarnmsg
+                wmod.warn("second")
+            finally:
+                wmod._showwarnmsg = saved_showwarnmsg
+        self.assertEqual(hits, ["first", "second"])
+
+
 class WCmdLineTests(BaseTest):
 
     def test_improper_input(self):

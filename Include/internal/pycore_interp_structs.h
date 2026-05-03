@@ -658,6 +658,15 @@ struct _warnings_runtime_state {
     _PyRecursiveMutex lock;
     long filters_version;
     PyObject *context;
+    /* Cached references to warnings._showwarnmsg and warnings.WarningMessage,
+       refreshed on every successful module attribute lookup. They allow
+       call_show_warning() to keep dispatching to a user-installed
+       warnings.showwarning hook after the warnings module has begun being
+       torn down (for example, when a __del__ raises a warning during
+       interpreter shutdown). The cache is meaningful only after at least
+       one normal warning emission has primed it. */
+    PyObject *cached_showwarnmsg;
+    PyObject *cached_warning_message_cls;
 };
 
 struct _Py_mem_interp_free_queue {
